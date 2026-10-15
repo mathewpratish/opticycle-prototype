@@ -43,4 +43,26 @@ describe('E2E /api/scan/analyze', function () {
 
     if (!res.body.analysis || !res.body.record) throw new Error('Missing analysis or record')
   })
+
+  it('creates a private guest session without sign-in credentials', async function () {
+    let createdUser
+    app.locals.prisma = {
+      user: {
+        create: async ({ data }) => {
+          createdUser = { id: 'guest-user-id', ...data }
+          return createdUser
+        },
+      },
+    }
+
+    const response = await request(app)
+      .post('/api/auth/guest')
+      .expect(200)
+
+    const session = jwt.verify(response.body.token, JWT_SECRET)
+    if (!session.guest || session.id !== createdUser.id) throw new Error('Guest token is missing its guest identity')
+    if (!createdUser.email.startsWith('guest-') || !createdUser.email.endsWith('@guest.opticycle.local')) {
+      throw new Error('Guest account should use a generated private email')
+    }
+  })
 })
