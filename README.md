@@ -12,7 +12,7 @@ npm.cmd run start:local
 
 The launcher installs dependencies only if they are missing, starts PostgreSQL if needed, applies existing migrations, and opens the API and frontend in separate terminals. Subsequent starts skip dependency installation and reuse healthy services. The first run still needs to download dependencies and the PostgreSQL image.
 
-Open `http://localhost:5173`, choose **Create Account**, and use a valid email and password between 8 and 128 characters. Camera access requires localhost or HTTPS. Capture a photo, review it, and explicitly select **Analyse Patch** to send it to the API. Use the history icon to view saved scans and the sign-out icon to end the session.
+Open `http://localhost:5173`; the app starts a private guest session automatically, so no sign-in is required. Camera access requires localhost or HTTPS. Capture a photo, review it, and explicitly select **Analyse Patch** to send it to the API. Use the history icon to view scans saved for this browser.
 
 The local API stores uploaded images in `server/uploads` by default. S3 is optional.
 
