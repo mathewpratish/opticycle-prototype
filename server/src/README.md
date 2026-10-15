@@ -38,9 +38,13 @@ Database and integration status
 - Is DB integrated: the Prisma schema and client are present in the repo, but you must run `npx prisma generate` and apply migrations (`npx prisma migrate dev`) locally or in CI to create the tables. Until migrations are applied, the API will not persist scan records.
 
 Frontend integration notes
-- CORS: the server restricts origins to `FRONTEND_URL` (env) or `http://localhost:5173` by default. Set `FRONTEND_URL` in production to the deployed frontend origin.
+- CORS: the server restricts origins to the comma-separated `FRONTEND_URL` values (or `http://localhost:5173` by default). Set this to the exact deployed frontend origin(s), without trailing slashes.
 - API client: see `src/apiClient.js` in the frontend for example usage of auth and scan calls.
 - OpenAPI: `server/openapi.yaml` contains a minimal spec you can import into Postman or similar.
+
+Deploy the API to Vercel as a separate project by selecting this repository and setting **Root Directory** to `server`. Vercel will build `api/[...path].js` as a serverless Express handler. Set `DATABASE_URL`, a strong `JWT_SECRET`, and `FRONTEND_URL` in the Vercel project's environment variables. Apply the Prisma migrations to the hosted PostgreSQL database with `npm run prisma:deploy` before using the API.
+
+Vercel's filesystem is temporary, so scan image storage must use S3. Configure `S3_BUCKET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY` in Vercel; the bucket must allow the API's configured public-read object uploads. Without S3, scan analysis returns a clear `503` rather than saving images to temporary storage. The API health check is available at `/api/health`.
 
 S3 / storage notes
 - The server uploads processed images to S3 when `S3_BUCKET` is set; otherwise images are saved locally under `uploads/` and served from `/uploads`.

@@ -19,12 +19,17 @@ dotenv.config()
 
 const prisma = new PrismaClient()
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads')
+const UPLOAD_DIR = process.env.UPLOAD_DIR || (process.env.VERCEL
+  ? path.join('/tmp', 'opticycle-uploads')
+  : path.join(__dirname, '..', 'uploads'))
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true })
 
 const app = express()
-// Allow requests from the frontend. Configure `FRONTEND_URL` in env for production.
-app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:5173' }))
+const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:5173')
+  .split(',')
+  .map((origin) => origin.trim().replace(/\/+$/, ''))
+  .filter(Boolean)
+app.use(cors({ origin: allowedOrigins }))
 app.use(express.json())
 app.use(helmet())
 app.use('/uploads', express.static(UPLOAD_DIR))
@@ -199,6 +204,10 @@ app.post('/api/scan/analyze', authMiddleware, upload.single('image'), async (req
     }
 
     if (!imageUrl) {
+      if (process.env.VERCEL) {
+        if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path)
+        return res.status(503).json({ error: 'Image storage is not configured. Configure S3 before analyzing scans.' })
+      }
       if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true })
       fs.writeFileSync(outPath, processedBuffer)
       imageUrl = `/uploads/${filename}`
@@ -233,7 +242,7 @@ app.get('/api/scan/history', authMiddleware, async (req, res) => {
   res.json({ scans })
 })
 
-app.get('/health', async (req, res) => {
+app.get(['/health', '/api/health'], async (req, res) => {
   try {
     const db = req.app.locals.prisma || prisma
     await db.$queryRaw`SELECT 1`
@@ -245,7 +254,7 @@ app.get('/health', async (req, res) => {
 
 // Export app for testing. Only listen when not running tests.
 const port = process.env.PORT || 4000
-if (process.env.NODE_ENV !== 'test') {
+if (!process.env.VERCEL && process.env.NODE_ENV !== 'test') {
   app.listen(port, () => console.log('API listening on', port))
 }
 
