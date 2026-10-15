@@ -1,0 +1,161 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Run Mocha tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install server dependencies
+        run: npm ci
+        working-directory: server
+
+      - name: Generate Prisma client
+        run: npx prisma generate --schema=prisma/schema.prisma
+        working-directory: server
+
+      - name: Run unit tests
+        run: npm test
+        working-directory: server
+        env:
+          NODE_ENV: test
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+
+  integration:
+    name: Integration tests (Postgres + LocalStack)
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: --health-cmd "pg_isready -U postgres" --health-interval 10s --health-timeout 5s --health-retries 5
+      localstack:
+        image: localstack/localstack:1.4
+        ports:
+          - 4566:4566
+        options: --health-cmd "curl -sS http://localhost:4566/health || exit 1" --health-interval 10s --health-timeout 5s --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Wait for services
+        run: |
+          echo "Waiting for Postgres and LocalStack..."
+          for i in {1..30}; do
+            nc -z localhost 5432 && nc -z localhost 4566 && break
+            echo "still waiting..."; sleep 2
+          done
+
+      - name: Install server dependencies
+        run: npm ci
+        working-directory: server
+
+      - name: Create test database
+        env:
+          PGPASSWORD: postgres
+        run: |
+          apt-get update && apt-get install -y postgresql-client
+          until pg_isready -h localhost -p 5432 -U postgres; do sleep 1; done
+          if ! psql -h localhost -U postgres -tAc "SELECT 1 FROM pg_database WHERE datname='opticycle'" | grep -q 1; then
+            psql -h localhost -U postgres -c "CREATE DATABASE opticycle;"
+          fi
+
+      - name: Set CI env for server (use secrets when provided)
+        run: |
+          # DATABASE_URL
+          if [ -n "${{ secrets.DATABASE_URL }}" ]; then
+            echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> $GITHUB_ENV
+          else
+            echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/opticycle?schema=public" >> $GITHUB_ENV
+          fi
+
+          # AWS_REGION
+          if [ -n "${{ secrets.AWS_REGION }}" ]; then
+            echo "AWS_REGION=${{ secrets.AWS_REGION }}" >> $GITHUB_ENV
+          else
+            echo "AWS_REGION=us-east-1" >> $GITHUB_ENV
+          fi
+
+          # AWS_ENDPOINT (LocalStack fallback)
+          if [ -n "${{ secrets.AWS_ENDPOINT }}" ]; then
+            echo "AWS_ENDPOINT=${{ secrets.AWS_ENDPOINT }}" >> $GITHUB_ENV
+          else
+            echo "AWS_ENDPOINT=http://localhost:4566" >> $GITHUB_ENV
+          fi
+
+          # S3_BUCKET
+          if [ -n "${{ secrets.S3_BUCKET }}" ]; then
+            echo "S3_BUCKET=${{ secrets.S3_BUCKET }}" >> $GITHUB_ENV
+          else
+            echo "S3_BUCKET=opticycle-ci-bucket" >> $GITHUB_ENV
+          fi
+
+          # AWS credentials (optional)
+          if [ -n "${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then
+            echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> $GITHUB_ENV
+          fi
+          if [ -n "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]; then
+            echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
+          fi
+
+          # JWT secret
+          if [ -n "${{ secrets.JWT_SECRET }}" ]; then
+            echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> $GITHUB_ENV
+          else
+            echo "JWT_SECRET=verysecret_dev_key" >> $GITHUB_ENV
+          fi
+
+      - name: Generate Prisma client
+        run: npx prisma generate --schema=prisma/schema.prisma
+        working-directory: server
+
+      - name: Apply Prisma migrations
+        run: npx prisma migrate deploy --schema=prisma/schema.prisma
+        working-directory: server
+
+      - name: Create S3 bucket in LocalStack
+        run: |
+          node -e "(async()=>{ const {S3Client, CreateBucketCommand} = await import('@aws-sdk/client-s3'); const c = new S3Client({endpoint: process.env.AWS_ENDPOINT, region: process.env.AWS_REGION, forcePathStyle:true}); await c.send(new CreateBucketCommand({Bucket: process.env.S3_BUCKET})); })().catch(e=>{console.error(e); process.exit(1)})"
+        working-directory: server
+
+      - name: Run integration tests
+        run: npm test
+        working-directory: server
+        env:
+          NODE_ENV: test
+          DATABASE_URL: ${{ env.DATABASE_URL }}
+          AWS_REGION: ${{ env.AWS_REGION }}
+          AWS_ENDPOINT: ${{ env.AWS_ENDPOINT }}
+          S3_BUCKET: ${{ env.S3_BUCKET }}
