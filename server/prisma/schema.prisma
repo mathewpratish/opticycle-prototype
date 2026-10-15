@@ -1,0 +1,29 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String       @id @default(uuid())
+  email        String       @unique
+  passwordHash String
+  createdAt    DateTime     @default(now())
+  scans        ScanRecord[]
+}
+
+model ScanRecord {
+  id         String   @id @default(uuid())
+  user       User     @relation(fields: [userId], references: [id])
+  userId     String
+  imageUrl   String
+  detectedHex String
+  labValues   Json
+  tier        Int
+  statusLabel String
+  remedies    String[]
+  createdAt   DateTime @default(now())
+}
