@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router-dom'
-import { AlertCircle, Camera, ChevronLeft, Clock3, Lock, LogOut, Mail, Sparkles, X } from 'lucide-react'
+import { AlertCircle, Camera, ChevronLeft, Clock3, Sparkles, X } from 'lucide-react'
 import apiClient from './apiClient'
 import './App.css'
 
@@ -13,126 +12,51 @@ const TIER_META = {
 }
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(() => !!localStorage.getItem('opticycle_token'))
+  const [sessionStatus, setSessionStatus] = useState(() => apiClient.hasToken() ? 'ready' : 'loading')
+  const [sessionError, setSessionError] = useState('')
 
-  const handleLogout = () => {
-    apiClient.logout()
-    setIsAuthenticated(false)
-  }
-
-  return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={isAuthenticated ? <Dashboard onLogout={handleLogout} /> : <Navigate to="/login" replace />} />
-        <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage onLogin={() => setIsAuthenticated(true)} />} />
-        <Route path="*" element={<Navigate to={isAuthenticated ? '/' : '/login'} replace />} />
-      </Routes>
-    </BrowserRouter>
-  )
-}
-
-function LoginPage({ onLogin }) {
-  const [mode, setMode] = useState('login')
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const navigate = useNavigate()
-  const isRegistering = mode === 'register'
-
-  const handleSubmit = async (event) => {
-    event.preventDefault()
-    setError('')
-    setLoading(true)
+  const startSession = async () => {
+    setSessionError('')
+    setSessionStatus('loading')
     try {
-      if (isRegistering) {
-        await apiClient.register(email, password)
-      } else {
-        await apiClient.login(email, password)
-      }
-      onLogin()
-      navigate('/')
-    } catch (err) {
-      setError(err.message || 'Unable to connect. Check that the API is running and try again.')
-    } finally {
-      setLoading(false)
+      await apiClient.startGuestSession()
+      setSessionStatus('ready')
+    } catch (error) {
+      setSessionError(error.message || 'Could not start a guest session. Check that the API is running.')
+      setSessionStatus('error')
     }
   }
 
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-[#f3f5fa] px-4 py-10">
-      <div className="w-full max-w-sm rounded-[28px] border border-slate-200/80 bg-[#f8f9fb] p-5 shadow-[0_20px_45px_rgba(15,23,42,0.08)]">
-        <div className="mb-7 flex items-center justify-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm">
-            <span className="block h-4 w-4 rounded-full border-[3px] border-slate-700 bg-white" />
-          </div>
-          <div className="text-3xl font-semibold tracking-[-0.06em] text-slate-800">OptiCycle</div>
-        </div>
+  useEffect(() => {
+    if (!apiClient.hasToken()) {
+      apiClient.startGuestSession()
+        .then(() => setSessionStatus('ready'))
+        .catch((error) => {
+          setSessionError(error.message || 'Could not start a guest session. Check that the API is running.')
+          setSessionStatus('error')
+        })
+    }
+  }, [])
 
-        <h1 className="mb-5 text-center text-lg font-semibold text-slate-700">
-          {isRegistering ? 'Create your account' : 'Welcome back'}
-        </h1>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <label className="block">
-            <span className="mb-2 block text-sm font-medium text-slate-600">Email</span>
-            <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3 shadow-sm focus-within:ring-2 focus-within:ring-slate-200">
-              <Mail size={18} className="text-slate-400" />
-              <input
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="you@example.com"
-                className="w-full border-0 bg-transparent text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none"
-                required
-              />
-            </div>
-          </label>
+  if (sessionStatus === 'loading') {
+    return <div className="flex min-h-screen items-center justify-center text-sm text-slate-600">Starting OptiCycle...</div>
+  }
 
-          <label className="block">
-            <span className="mb-2 block text-sm font-medium text-slate-600">Password</span>
-            <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-3 shadow-sm focus-within:ring-2 focus-within:ring-slate-200">
-              <Lock size={18} className="text-slate-400" />
-              <input
-                type="password"
-                autoComplete={isRegistering ? 'new-password' : 'current-password'}
-                minLength={isRegistering ? 8 : undefined}
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder={isRegistering ? 'At least 8 characters' : 'Password'}
-                className="w-full border-0 bg-transparent text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none"
-                required
-              />
-            </div>
-          </label>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="mt-3 w-full rounded-2xl bg-gradient-to-r from-pink-300 to-pink-400 px-4 py-3 text-base font-semibold text-white shadow-[0_12px_24px_rgba(244,138,165,0.35)] transition hover:opacity-95 disabled:cursor-wait disabled:opacity-60"
-          >
-            {loading ? 'Please wait...' : isRegistering ? 'Create Account' : 'Sign In'}
-          </button>
-        </form>
-
-        {error && <p role="alert" className="mt-4 text-center text-sm text-rose-600">{error}</p>}
-
-        <div className="mt-6 text-center text-sm text-slate-500">
-          <button
-            type="button"
-            disabled={loading}
-            onClick={() => { setMode(isRegistering ? 'login' : 'register'); setError('') }}
-            className="font-medium text-pink-500 hover:text-pink-600"
-          >
-            {isRegistering ? 'Already have an account? Sign in' : 'Create Account'}
-          </button>
-        </div>
+  if (sessionStatus === 'error') {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
+        <p role="alert" className="text-sm text-rose-700">{sessionError}</p>
+        <button type="button" onClick={startSession} className="rounded-2xl bg-pink-400 px-5 py-3 font-semibold text-white">
+          Try again
+        </button>
       </div>
-    </div>
-  )
+    )
+  }
+
+  return <Dashboard />
 }
 
-function Dashboard({ onLogout }) {
+function Dashboard() {
   const [capturedImage, setCapturedImage] = useState('')
   const [analysisResult, setAnalysisResult] = useState(null)
   const [isHistoryOpen, setIsHistoryOpen] = useState(false)
@@ -146,7 +70,6 @@ function Dashboard({ onLogout }) {
   const videoRef = useRef(null)
   const streamRef = useRef(null)
   const capturedFileRef = useRef(null)
-  const navigate = useNavigate()
 
   useEffect(() => {
     let active = true
@@ -274,14 +197,9 @@ function Dashboard({ onLogout }) {
               </div>
               <span className="text-[17px] font-semibold tracking-[-0.05em] text-slate-700">OptiCycle</span>
             </div>
-            <div className="flex items-center gap-1">
-              <button type="button" onClick={handleShowHistory} aria-label="View scan history" className="rounded-full p-2 text-slate-500 hover:bg-slate-100">
-                <Clock3 size={19} />
-              </button>
-              <button type="button" onClick={() => { onLogout(); navigate('/login') }} aria-label="Sign out" className="rounded-full p-2 text-slate-500 hover:bg-slate-100">
-                <LogOut size={19} />
-              </button>
-            </div>
+            <button type="button" onClick={handleShowHistory} aria-label="View scan history" className="rounded-full p-2 text-slate-500 hover:bg-slate-100">
+              <Clock3 size={19} />
+            </button>
           </div>
 
           <div className="relative overflow-hidden rounded-[26px] bg-[#efe7e1] shadow-inner ring-1 ring-slate-200">

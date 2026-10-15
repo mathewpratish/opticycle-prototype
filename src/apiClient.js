@@ -8,37 +8,35 @@ function getToken() {
   return localStorage.getItem('opticycle_token')
 }
 
+let guestSessionRequest
+
 async function readResponse(response) {
   const data = await response.json().catch(() => ({}))
   if (!response.ok) {
-    if (response.status === 401) logout()
+    if (response.status === 401) localStorage.removeItem('opticycle_token')
     throw new Error(data.error || `Request failed (${response.status})`)
   }
   return data
 }
 
-function saveAuthResponse(data) {
-  if (!data.token) throw new Error('The server did not return an authentication token.')
-  saveToken(data.token)
-  return data
+export function hasToken() {
+  return !!getToken()
 }
 
-export async function register(email, password) {
-  const res = await fetch(`${API_BASE}/api/auth/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-  })
-  return saveAuthResponse(await readResponse(res))
-}
-
-export async function login(email, password) {
-  const res = await fetch(`${API_BASE}/api/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-  })
-  return saveAuthResponse(await readResponse(res))
+export async function startGuestSession() {
+  if (getToken()) return
+  if (!guestSessionRequest) {
+    guestSessionRequest = fetch(`${API_BASE}/api/auth/guest`, { method: 'POST' })
+      .then(readResponse)
+      .then((data) => {
+        if (!data.token) throw new Error('The server did not return a guest session token.')
+        saveToken(data.token)
+      })
+      .finally(() => {
+        guestSessionRequest = undefined
+      })
+  }
+  return guestSessionRequest
 }
 
 export async function analyzeFile(file) {
@@ -64,8 +62,4 @@ export async function getHistory() {
   return data
 }
 
-export function logout() {
-  localStorage.removeItem('opticycle_token')
-}
-
-export default { register, login, analyzeFile, getHistory, logout }
+export default { hasToken, startGuestSession, analyzeFile, getHistory }
