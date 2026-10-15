@@ -1,0 +1,36 @@
+{
+  "name": "opticycle-api",
+  "version": "1.0.0",
+  "description": "OptiCycle backend API with Express, Prisma, JWT and colorimetric scan analysis",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "test": "mocha --exit \"test/**/*.test.js\"",
+    "prisma:generate": "prisma generate",
+    "prisma:deploy": "prisma migrate deploy",
+    "prisma:migrate": "prisma migrate dev --name init",
+    "prisma:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.16.0",
+    "bcryptjs": "^3.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.0.0",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.0.0",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.0",
+    "multer": "^2.0.0",
+    "prisma": "^6.16.0",
+    "sharp": "^0.34.3",
+    "uuid": "^11.0.0",
+    "@aws-sdk/client-s3": "^3.401.0"
+  },
+  "devDependencies": {
+    "mocha": "^10.2.0",
+    "chai": "^4.3.8",
+    "supertest": "^6.3.3"
+  }
+}

@@ -1,0 +1,72 @@
+openapi: 3.0.3
+info:
+  title: OptiCycle API
+  version: 1.0.0
+servers:
+  - url: http://localhost:4000
+paths:
+  /api/auth/register:
+    post:
+      summary: Register user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: token
+  /api/auth/login:
+    post:
+      summary: Login user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: token
+  /api/scan/analyze:
+    post:
+      summary: Analyze image
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                image:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: analysis and record
+  /api/scan/history:
+    get:
+      summary: Get user's scan history
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: list of scans
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
