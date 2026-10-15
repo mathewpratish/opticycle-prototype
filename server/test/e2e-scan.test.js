@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken'
 import sharp from 'sharp'
 import { app } from '../src/server.js'
 
-const JWT_SECRET = process.env.JWT_SECRET || 'verysecret_dev_key'
+const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret'
 
 describe('E2E /api/scan/analyze', function () {
   it('accepts image and returns analysis', async function () {
