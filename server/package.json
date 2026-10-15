@@ -9,6 +9,7 @@
     "start": "node src/server.js",
     "test": "mocha --exit \"test/**/*.test.js\"",
     "prisma:generate": "prisma generate",
+    "vercel-build": "prisma generate",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:migrate": "prisma migrate dev --name init",
     "prisma:studio": "prisma studio"
