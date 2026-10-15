@@ -80,6 +80,15 @@ function authMiddleware(req, res, next) {
   }
 }
 
+app.post('/api/auth/guest', async (req, res) => {
+  const db = req.app.locals.prisma || prisma
+  const email = `guest-${uuidv4()}@guest.opticycle.local`
+  const passwordHash = await bcrypt.hash(`${uuidv4()}${uuidv4()}`, 10)
+  const user = await db.user.create({ data: { email, passwordHash } })
+  const token = signToken({ id: user.id, email: user.email, guest: true })
+  res.json({ token })
+})
+
 app.post('/api/auth/register', async (req, res) => {
   const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : ''
   const password = req.body.password
