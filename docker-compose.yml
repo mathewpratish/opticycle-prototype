@@ -1,0 +1,72 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: opticycle-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: opticycle
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d opticycle']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: opticycle-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: 4000
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/opticycle?schema=public
+      JWT_SECRET: verysecret_dev_key
+      FRONTEND_URL: http://localhost:5173
+      UPLOAD_DIR: /app/uploads
+      AWS_REGION: us-east-1
+      S3_BUCKET: ''
+      AWS_ACCESS_KEY_ID: ''
+      AWS_SECRET_ACCESS_KEY: ''
+    ports:
+      - '4000:4000'
+    volumes:
+      - ./server:/app
+      - /app/node_modules
+      - api_uploads:/app/uploads
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -f http://localhost:4000/health || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: opticycle-web
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      VITE_API_URL: http://localhost:4000
+    ports:
+      - '5173:5173'
+    volumes:
+      - .:/app
+      - /app/node_modules
+
+volumes:
+  postgres_data:
+  api_uploads:
