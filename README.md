@@ -22,18 +22,18 @@ This repository remains a prototype, not a clinically validated or production-re
 
 Before production deployment, configure strong secret management, HTTPS, production database and image storage, backups and retention policies, monitoring, rate limits, privacy/consent notices, and a security review. Do not use the development secrets or local Docker credentials for a public deployment.
 
-## Deploy the API to Vercel
+## Deploy to Vercel
 
-Deploy the API as a separate Vercel project using this same GitHub repository, with **Root Directory** set to `server`. The API includes a Vercel serverless Express handler at `server/api/[...path].js`; its health check will be available at `https://<api-project>.vercel.app/api/health`.
+The root [`vercel.json`](./vercel.json) configures one Vercel project with two services: the Vite frontend (`app`) and Express API (`server`). The `/api/*` rewrite sends API requests to the backend; all other paths go to the frontend. In production, the frontend calls the API on this same origin. The API includes a Vercel serverless handler at `server/api/[...path].js`; its health check is available at `/api/health`.
 
-Before deploying, provision a hosted PostgreSQL database and an S3 bucket. In the API project's Vercel environment variables, set:
+Before deploying, provision a hosted PostgreSQL database and an S3 bucket. In the Vercel project's environment variables, set:
 
 - `DATABASE_URL` to the hosted PostgreSQL connection string.
 - `JWT_SECRET` to a strong, randomly generated secret.
 - `FRONTEND_URL` to the exact frontend origin (for example, `https://opticycle-prototype.vercel.app`). Multiple allowed origins can be comma-separated.
 - `S3_BUCKET`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, and `AWS_SECRET_ACCESS_KEY` for persistent scan-image storage. The bucket must permit the API's public-read uploads.
 
-Apply the database migrations from the `server` directory with `npm run prisma:deploy` using the hosted `DATABASE_URL`. Then set `VITE_API_URL` in the frontend Vercel project's environment variables to the API project's base URL (for example, `https://<api-project>.vercel.app`) and redeploy the frontend. Do not append `/api` to `VITE_API_URL`.
+Apply the database migrations from the `server` directory with `npm run prisma:deploy` using the hosted `DATABASE_URL`. Import the repository into Vercel with the repository root as the project root so Vercel can read `vercel.json` and build both services together. No `VITE_API_URL` is required for this same-origin setup.
 
 ## Tests
 
