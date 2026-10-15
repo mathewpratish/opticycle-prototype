@@ -86,7 +86,7 @@ jobs:
         env:
           PGPASSWORD: postgres
         run: |
-          apt-get update && apt-get install -y postgresql-client
+          sudo apt-get update && sudo apt-get install -y postgresql-client
           until pg_isready -h localhost -p 5432 -U postgres; do sleep 1; done
           if ! psql -h localhost -U postgres -tAc "SELECT 1 FROM pg_database WHERE datname='opticycle'" | grep -q 1; then
             psql -h localhost -U postgres -c "CREATE DATABASE opticycle;"
@@ -125,16 +125,20 @@ jobs:
           # AWS credentials (optional)
           if [ -n "${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then
             echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> $GITHUB_ENV
+          else
+            echo "AWS_ACCESS_KEY_ID=test" >> $GITHUB_ENV
           fi
           if [ -n "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]; then
             echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
+          else
+            echo "AWS_SECRET_ACCESS_KEY=test" >> $GITHUB_ENV
           fi
 
           # JWT secret
           if [ -n "${{ secrets.JWT_SECRET }}" ]; then
             echo "JWT_SECRET=${{ secrets.JWT_SECRET }}" >> $GITHUB_ENV
           else
-            echo "JWT_SECRET=verysecret_dev_key" >> $GITHUB_ENV
+            echo "JWT_SECRET=dev_secret" >> $GITHUB_ENV
           fi
 
       - name: Generate Prisma client
