@@ -2,6 +2,7 @@ import request from 'supertest'
 import jwt from 'jsonwebtoken'
 import sharp from 'sharp'
 import { app } from '../src/server.js'
+import vercelHandler from '../api/[...path].js'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret'
 
@@ -64,5 +65,20 @@ describe('E2E /api/scan/analyze', function () {
     if (!createdUser.email.startsWith('guest-') || !createdUser.email.endsWith('@guest.opticycle.local')) {
       throw new Error('Guest account should use a generated private email')
     }
+  })
+
+  it('routes Vercel catch-all API paths to the Express API', async function () {
+    app.locals.prisma = {
+      user: {
+        create: async ({ data }) => ({ id: 'vercel-guest-id', ...data }),
+      },
+    }
+
+    const response = await request(vercelHandler)
+      .post('/auth/guest')
+      .expect(200)
+
+    const session = jwt.verify(response.body.token, JWT_SECRET)
+    if (session.id !== 'vercel-guest-id') throw new Error('Vercel handler did not route the API request')
   })
 })
